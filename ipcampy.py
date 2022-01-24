@@ -5,7 +5,7 @@
 import cv2
 import numpy as np
 import config
-from flask import Flask, request, send_file
+from flask import Flask, request, send_file, render_template, abort
 
 from io import BytesIO
 
@@ -24,8 +24,14 @@ ALLOWED_EXTENSIONS = set(['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'ico'])
 def init():
     global cap
 
+    if not cap is None:
+        print("DBG: recycling")
+        cap.release()
+
     camurl = "rtsp://" + config.myconfig["login"] + ":" + config.myconfig["password"] + "@" + config.myconfig["ip"] + ":" + config.myconfig["port"]+ config.myconfig["suffix"]
     #print ("DBG: camurl = " + camurl)
+
+    #takes 1-2 sec so do as rarely as you can
     cap = cv2.VideoCapture(camurl)
 
 
@@ -34,16 +40,22 @@ def init():
 
 @app.route('/')
 def homepage():
-    return '''Hello monde! <br/>
-    <a href="capture.jpg">See the capture</a>'''
+    return render_template("template01.html", pagename="Home")
 
     
 @app.route('/capture.jpg')
 def captureImage():
     global cap
 
-    #read one frame
+    #read one frame (numpy.ndarray object)
     ret, frame = cap.read()
+
+    #sometimes the capture fails and it means you're good to recycle your OpenCV capture.
+    #accept to lose this frame (avoid infinite loop) and attempt recycling
+    if frame is None or frame.size == 0:
+        print ("DBG: empty frame, attempt recycling")
+        init()
+        abort(500)
 
     #write frame to memory buffer as JPEG
     is_success, buffer = cv2.imencode(".jpg", frame)
@@ -68,4 +80,5 @@ if __name__ == '__main__':
 
     finally:
         if cap != None:
+            print("Release OpenCV ...")
             cap.release()
