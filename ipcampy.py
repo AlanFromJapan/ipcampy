@@ -5,7 +5,8 @@
 import cv2
 import numpy as np
 import config
-from flask import Flask, request, send_file, render_template, abort
+from flask import Flask, request, send_file, render_template, abort, redirect, make_response
+from datetime import datetime, timedelta
 
 from io import BytesIO
 
@@ -28,7 +29,7 @@ def init():
         print("DBG: recycling")
         cap.release()
 
-    camurl = "rtsp://" + config.myconfig["login"] + ":" + config.myconfig["password"] + "@" + config.myconfig["ip"] + ":" + config.myconfig["port"]+ config.myconfig["suffix"]
+    camurl = "rtsp://" + config.myconfig["cam_login"] + ":" + config.myconfig["cam_password"] + "@" + config.myconfig["ip"] + ":" + config.myconfig["port"]+ config.myconfig["suffix"]
     #print ("DBG: camurl = " + camurl)
 
     #takes 1-2 sec so do as rarely as you can
@@ -40,12 +41,20 @@ def init():
 
 @app.route('/')
 def homepage():
+    #not logged in? go away
+    if None == request.cookies.get('username'):
+        return redirect("login")
     return render_template("template01.html", pagename="Home")
 
     
 @app.route('/capture.jpg')
 def captureImage():
     global cap
+
+    #not logged in? go away
+    if None == request.cookies.get('username'):
+        abort(500)  
+        return
 
     #read one frame (numpy.ndarray object)
     ret, frame = cap.read()
@@ -66,6 +75,30 @@ def captureImage():
 
     #return the in memory image
     return send_file(io_buf, mimetype='image/jpeg')
+
+
+##########################################################################################
+#Login page
+@app.route('/login', methods=['POST', 'GET'])
+def doLogin():
+    if request.method == "GET":
+        return render_template("login01.html", pagename="login", message="")
+    else:
+        vLogin = request.form["login"]
+        vPwd = request.form["pwd"]
+        
+        if vLogin == config.myconfig["app_login"] and vPwd == config.myconfig["app_password"]:
+            #Login is correct
+            resp = make_response( redirect("/") )
+            
+            resp.set_cookie ('username', vLogin, expires=datetime.now() + timedelta(days=30))
+                
+            return resp
+        else:
+            #incorrect login
+            return render_template("login", pagename="login", message="Login incorrect")
+
+
 
 
 ########################################################################################
