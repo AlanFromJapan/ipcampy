@@ -7,6 +7,7 @@ import numpy as np
 import config
 from flask import Flask, request, send_file, render_template, abort, redirect, make_response
 from datetime import datetime, timedelta
+import sys
 
 from io import BytesIO
 
@@ -29,7 +30,7 @@ def init():
         print("DBG: recycling")
         cap.release()
 
-    camurl = "rtsp://" + config.myconfig["cam_login"] + ":" + config.myconfig["cam_password"] + "@" + config.myconfig["ip"] + ":" + config.myconfig["port"]+ config.myconfig["suffix"]
+    camurl = "rtsp://" + config.myconfig["cam_login"] + ":" + config.myconfig["cam_password"] + "@" + config.myconfig["cam_ip"] + ":" + config.myconfig["cam_port"]+ config.myconfig["cam_suffix"]
     #print ("DBG: camurl = " + camurl)
 
     #takes 1-2 sec so do as rarely as you can
@@ -105,11 +106,25 @@ def doLogin():
 ## Main entry point
 #
 if __name__ == '__main__':
+    print ("""
+USAGE:
+    python3 ipcampy.py [path_to_cert.pem path_to_key.perm]
+
+If you don't provide the *.pem files it will start as an HTTP app. You need to pass both .pem files to run as HTTPS.
+    """)
     try:
         #start web interface
         app.debug = True
-        # Remeber to add the command to your Manager instance
-        app.run(host='0.0.0.0', port=56789, threaded=True)
+        
+        #run as HTTPS?
+        if len(sys.argv) == 3:
+            #go HTTPS
+            print("INFO: start as HTTPSSSSSSSSSSS")
+            app.run(host='0.0.0.0', port=int(config.myconfig["app_port"]), threaded=True, ssl_context=(sys.argv[1], sys.argv[2]))
+        else:
+            #not secured HTTP
+            print("INFO: start as HTTP unsecured")
+            app.run(host='0.0.0.0', port=int(config.myconfig["app_port"]), threaded=True)
 
     finally:
         if cap != None:
